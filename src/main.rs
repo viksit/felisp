@@ -1,5 +1,5 @@
 /// Felisp
-/// A Simple lisp inspired by Peter Norvig's lispy
+/// A Simple lisp inspired by Peter Norvig's lispy and risp by @stopachka
 ///
 /// First the rutth calculator
 /*
