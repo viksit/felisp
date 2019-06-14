@@ -17,6 +17,8 @@ use std::io;
 use std::io::{stdin, stdout, Write};
 use std::num::ParseFloatError;
 use std::rc::Rc;
+use std::process;
+
 
 #[derive(Clone)]
 enum FelispExp {
@@ -276,6 +278,11 @@ fn eval_insert_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<Feli
     Ok(first_form.clone())
 }
 
+fn eval_exit_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
+    println!("Called exit");
+    process::exit(0x0100);
+}
+
 
 fn eval_lambda_args(arg_forms: &[FelispExp]) -> Result<FelispExp, FelispErr> {
     let params_exp = arg_forms.first().ok_or(
@@ -318,6 +325,7 @@ fn eval_built_in_form(
                 "fn" => Some(eval_lambda_args(arg_forms)),
                 "select" => Some(eval_select_args(arg_forms, env)),
                 "insert" => Some(eval_insert_args(arg_forms, env)),
+                "exit" => Some(eval_exit_args(arg_forms, env)),
                 _ => None,
             }
         ,
