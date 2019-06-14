@@ -256,6 +256,26 @@ fn eval_defn_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<Felisp
     Ok(first_form.clone())
 }
 
+fn eval_select_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
+    let first_form = arg_forms.first().ok_or(
+        FelispErr::Reason(
+            "expected first form".to_string(),
+        )
+    )?;
+    println!(">> Called Select");
+    Ok(first_form.clone())
+}
+
+fn eval_insert_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
+    let first_form = arg_forms.first().ok_or(
+        FelispErr::Reason(
+            "expected first form".to_string(),
+        )
+    )?;
+    println!("Called insert k={}", first_form);
+    Ok(first_form.clone())
+}
+
 
 fn eval_lambda_args(arg_forms: &[FelispExp]) -> Result<FelispExp, FelispErr> {
     let params_exp = arg_forms.first().ok_or(
@@ -296,6 +316,8 @@ fn eval_built_in_form(
                 "if" => Some(eval_if_args(arg_forms, env)),
                 "defn" => Some(eval_defn_args(arg_forms, env)),
                 "fn" => Some(eval_lambda_args(arg_forms)),
+                "select" => Some(eval_select_args(arg_forms, env)),
+                "insert" => Some(eval_insert_args(arg_forms, env)),
                 _ => None,
             }
         ,
