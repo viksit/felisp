@@ -16,6 +16,7 @@ use std::fmt;
 use std::io;
 use std::io::{stdin, stdout, Write};
 use std::num::ParseFloatError;
+use std::rc::Rc;
 
 #[derive(Clone)]
 enum FelispExp {
@@ -24,7 +25,7 @@ enum FelispExp {
     Number(f64),
     List(Vec<FelispExp>),
     Func(fn(&[FelispExp]) -> Result<FelispExp, FelispErr>), // function evaluations
-
+    Lambda(FelispLambda),
 }
 
 
@@ -38,7 +39,8 @@ impl fmt::Display for FelispExp {
                 format!("({})", xs.join(","))
             }
             FelispExp::Func(_) => "Function {}".to_string(),
-            FelispExp::Bool(a) => a.to_string()
+            FelispExp::Bool(a) => a.to_string(),
+            FelispExp::Lambda(_) => "Lambda {}".to_string(),
         };
 
         write!(f, "{}", str)
@@ -51,9 +53,17 @@ enum FelispErr {
 }
 
 #[derive(Clone)]
-struct FelispEnv {
+struct FelispEnv<'a> {
     data: HashMap<String, FelispExp>,
+    outer: Option<&'a FelispEnv<'a>>,
 }
+
+#[derive(Clone)]
+struct FelispLambda {
+    params_exp: Rc<FelispExp>,
+    body_exp: Rc<FelispExp>
+}
+
 
 // Create a tokenizer that takes a felisp expression in string
 // and converts it to an AST
@@ -128,7 +138,7 @@ macro_rules! ensure_tonicity {
 }
 
 // Set up the environment to control functions and operators
-fn default_env() -> FelispEnv {
+fn default_env<'a>() -> FelispEnv<'a> {
     let mut data: HashMap<String, FelispExp> = HashMap::new();
 
     // Addition operators
@@ -176,7 +186,7 @@ fn default_env() -> FelispEnv {
         FelispExp::Func(ensure_tonicity!(|a, b| a <= b))
     );
 
-    FelispEnv { data } // Return expression
+    FelispEnv { data, outer: None } // Return expression
 }
 
 // Helper function that enforces all FelispExp's that we receive are floats
@@ -246,6 +256,37 @@ fn eval_defn_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<Felisp
     Ok(first_form.clone())
 }
 
+
+fn eval_lambda_args(arg_forms: &[FelispExp]) -> Result<FelispExp, FelispErr> {
+    let params_exp = arg_forms.first().ok_or(
+        FelispErr::Reason(
+            "expected args form".to_string(),
+        )
+    )?;
+    let body_exp = arg_forms.get(1).ok_or(
+        FelispErr::Reason(
+            "expected second form".to_string(),
+        )
+    )?;
+
+    if arg_forms.len() > 2 {
+        return Err(
+            FelispErr::Reason(
+                "fn definition can only have two forms".to_string()
+            )
+        )
+    }
+
+    Ok(
+        FelispExp::Lambda(
+            FelispLambda {
+                body_exp: Rc::new(body_exp.clone()),
+                params_exp: Rc::new(params_exp.clone()),
+            }
+        )
+    )
+}
+
 fn eval_built_in_form(
     exp: &FelispExp, arg_forms: &[FelispExp], env: &mut FelispEnv
 ) -> Option<Result<FelispExp, FelispErr>> {
@@ -254,6 +295,7 @@ fn eval_built_in_form(
             match s.as_ref() {
                 "if" => Some(eval_if_args(arg_forms, env)),
                 "defn" => Some(eval_defn_args(arg_forms, env)),
+                "fn" => Some(eval_lambda_args(arg_forms)),
                 _ => None,
             }
         ,
@@ -261,14 +303,77 @@ fn eval_built_in_form(
     }
 }
 
+fn env_get(k: &str, env: &FelispEnv) -> Option<FelispExp> {
+    match env.data.get(k) {
+        Some(exp) => Some(exp.clone()),
+        None => {
+            match &env.outer {
+                Some(outer_env) => env_get(k, &outer_env),
+                None => None
+            }
+        }
+    }
+}
+
+
+fn eval_forms(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<Vec<FelispExp>, FelispErr> {
+    arg_forms
+        .iter()
+        .map(|x| eval(x, env))
+        .collect()
+}
+
+fn parse_list_of_symbol_strings(form: Rc<FelispExp>) -> Result<Vec<String>, FelispErr> {
+    let list = match form.as_ref() {
+        FelispExp::List(s) => Ok(s.clone()),
+        _ => Err(FelispErr::Reason(
+            "expected args form to be a list".to_string(),
+        ))
+    }?;
+    list
+        .iter()
+        .map(
+            |x| {
+                match x {
+                    FelispExp::Symbol(s) => Ok(s.clone()),
+                    _ => Err(FelispErr::Reason(
+                        "expected symbols in the argument list".to_string(),
+                    ))
+                }
+            }
+        ).collect()
+}
+
+fn env_for_lambda<'a>(
+    params: Rc<FelispExp>,
+    arg_forms: &[FelispExp],
+    outer_env: &'a mut FelispEnv,
+) -> Result<FelispEnv<'a>, FelispErr> {
+    let ks = parse_list_of_symbol_strings(params)?;
+    if ks.len() != arg_forms.len() {
+        return Err(
+            FelispErr::Reason(
+                format!("expected {} arguments, got {}", ks.len(), arg_forms.len())
+            )
+        );
+    }
+    let vs = eval_forms(arg_forms, outer_env)?;
+    let mut data: HashMap<String, FelispExp> = HashMap::new();
+    for (k, v) in ks.iter().zip(vs.iter()) {
+        data.insert(k.clone(), v.clone());
+    }
+    Ok(
+        FelispEnv {
+            data,
+            outer: Some(outer_env),
+        }
+    )
+
+}
+
 // Eval function
 fn eval(exp: &FelispExp, env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
     match exp {
-        FelispExp::Symbol(k) => env
-            .data
-            .get(k)
-            .ok_or(FelispErr::Reason(format!("unexpected symbol k='{}'", k)))
-            .map(|x| x.clone()),
         FelispExp::Number(_a) => Ok(exp.clone()),
         // FelispExp::List(list) => {
         //     let first_form = list
@@ -308,13 +413,26 @@ fn eval(exp: &FelispExp, env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
                                 .collect::<Result<Vec<FelispExp>, FelispErr>>();
                             return f(&args_eval?);
                         },
+                        FelispExp::Lambda(lambda) => {
+                            let new_env = &mut env_for_lambda(lambda.params_exp, arg_forms, env)?;
+                            eval(&lambda.body_exp, new_env)
+                        },
                         _ => Err(
                             FelispErr::Reason("first form must be a function".to_string())
                         ),
                     }
                 }
             }
-        },
+        }
+        FelispExp::Lambda(_) => Err(FelispErr::Reason("unexpected form in lambda".to_string())),
+        FelispExp::Symbol(k) =>
+            env_get(k, env)
+            .ok_or(
+                FelispErr::Reason(
+                    format!("<< unexpected symbol k='{}'", k)
+                )
+            ),
+
 
     }
 }
