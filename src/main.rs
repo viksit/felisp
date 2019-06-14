@@ -191,6 +191,76 @@ fn parse_single_float(exp: &FelispExp) -> Result<f64, FelispErr> {
     }
 }
 
+fn eval_if_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
+    let test_form = arg_forms.first().ok_or(
+        FelispErr::Reason(
+            "expected test form".to_string(),
+        )
+    )?;
+    let test_eval = eval(test_form, env)?;
+    match test_eval {
+        FelispExp::Bool(b) => {
+            let form_idx = if b { 1 } else { 2 };
+            let res_form = arg_forms.get(form_idx)
+                .ok_or(FelispErr::Reason(
+                    format!("expected form idx={}", form_idx)
+                ))?;
+            let res_eval = eval(res_form, env);
+
+            res_eval
+        },
+        _ => Err(
+            FelispErr::Reason(format!("unexpected test form='{}'", test_form.to_string()))
+        )
+    }
+}
+
+
+fn eval_defn_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
+    let first_form = arg_forms.first().ok_or(
+        FelispErr::Reason(
+            "expected first form".to_string(),
+        )
+    )?;
+    let first_str = match first_form {
+        FelispExp::Symbol(s) => Ok(s.clone()),
+        _ => Err(FelispErr::Reason(
+            "expected first form to be a symbol".to_string(),
+        ))
+    }?;
+    let second_form = arg_forms.get(1).ok_or(
+        FelispErr::Reason(
+            "expected second form".to_string(),
+        )
+    )?;
+    if arg_forms.len() > 2 {
+        return Err(
+            FelispErr::Reason(
+                "def can only have two forms ".to_string(),
+            )
+        )
+    }
+    let second_eval = eval(second_form, env)?;
+    env.data.insert(first_str, second_eval);
+
+    Ok(first_form.clone())
+}
+
+fn eval_built_in_form(
+    exp: &FelispExp, arg_forms: &[FelispExp], env: &mut FelispEnv
+) -> Option<Result<FelispExp, FelispErr>> {
+    match exp {
+        FelispExp::Symbol(s) =>
+            match s.as_ref() {
+                "if" => Some(eval_if_args(arg_forms, env)),
+                "defn" => Some(eval_defn_args(arg_forms, env)),
+                _ => None,
+            }
+        ,
+        _ => None,
+    }
+}
+
 // Eval function
 fn eval(exp: &FelispExp, env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
     match exp {
@@ -200,29 +270,55 @@ fn eval(exp: &FelispExp, env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
             .ok_or(FelispErr::Reason(format!("unexpected symbol k='{}'", k)))
             .map(|x| x.clone()),
         FelispExp::Number(_a) => Ok(exp.clone()),
+        // FelispExp::List(list) => {
+        //     let first_form = list
+        //         .first()
+        //         .ok_or(FelispErr::Reason("expected a non-empty list".to_string()))?;
+        //     let arg_forms = &list[1..];
+        //     let first_eval = eval(first_form, env)?;
+        //     match first_eval {
+        //         FelispExp::Func(f) => {
+        //             let args_eval = arg_forms
+        //                 .iter()
+        //                 .map(|x| eval(x, env))
+        //                 .collect::<Result<Vec<FelispExp>, FelispErr>>();
+        //             f(&args_eval?)
+        //         }
+        //         _ => Err(FelispErr::Reason(
+        //             "first form must be a function".to_string(),
+        //         )),
+        //     }
+        // }
+        FelispExp::Func(_) => Err(FelispErr::Reason("unexpected form".to_string())),
+        FelispExp::Bool(_a) => Ok(exp.clone()),
         FelispExp::List(list) => {
             let first_form = list
                 .first()
                 .ok_or(FelispErr::Reason("expected a non-empty list".to_string()))?;
             let arg_forms = &list[1..];
-            let first_eval = eval(first_form, env)?;
-            match first_eval {
-                FelispExp::Func(f) => {
-                    let args_eval = arg_forms
-                        .iter()
-                        .map(|x| eval(x, env))
-                        .collect::<Result<Vec<FelispExp>, FelispErr>>();
-                    f(&args_eval?)
+            match eval_built_in_form(first_form, arg_forms, env) {
+                Some(res) => res,
+                None => {
+                    let first_eval = eval(first_form, env)?;
+                    match first_eval {
+                        FelispExp::Func(f) => {
+                            let args_eval = arg_forms
+                                .iter()
+                                .map(|x| eval(x, env))
+                                .collect::<Result<Vec<FelispExp>, FelispErr>>();
+                            return f(&args_eval?);
+                        },
+                        _ => Err(
+                            FelispErr::Reason("first form must be a function".to_string())
+                        ),
+                    }
                 }
-                _ => Err(FelispErr::Reason(
-                    "first form must be a function".to_string(),
-                )),
             }
-        }
-        FelispExp::Func(_) => Err(FelispErr::Reason("unexpected form".to_string())),
-        FelispExp::Bool(_a) => Ok(exp.clone())
+        },
+
     }
 }
+
 
 // Repl function
 
