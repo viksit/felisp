@@ -486,13 +486,15 @@ struct Row {
 
 #[derive(Debug)]
 struct Table {
+    name: String,
     num_rows: i32,
     pages: i32,
     rows: Vec<Row>
 }
 
+// TODO(viksit): add a result with success etc to these functions
 
-fn insert_row_into_table(
+fn execute_insert(
     table: &mut Table,
     id: i32,
     username: String,
@@ -505,27 +507,46 @@ fn insert_row_into_table(
         username: username
     };
     table.rows.push(row);
+    table.num_rows += 1;
 }
 
-fn test1() {
-    let mut rows: Vec<Row> = vec![]; // or Vec::new()
+fn execute_select(table: &mut Table) {
+    println!("Table: <{}>", table.name);
+    for row in &table.rows {
+        println!("{:?}", row);
+    }
+}
+
+fn test_insert1() {
+    let mut rows: Vec<Row> = Vec::new(); // or Vec::new()
     let mut t = Table {
+        name: String::from("mytable1"),
         num_rows: 0,
         pages: 0,
         rows: rows
     };
-    insert_row_into_table(
+    execute_insert(
         &mut t,
         1,
         String::from("akriti"),
         String::from("akritigaur@gmail.com")
     );
-    println!("Table: {:?}", t);
+    execute_insert(
+        &mut t,
+        10,
+        String::from("viksit"),
+        String::from("viksit@gmail.com")
+    );
+    // println!("Table: {:?}", t);
+    execute_select(&mut t);
 }
 
+
+
 fn main() {
-    test1();
+    test_insert1();
 }
+
 // fn main() {
 
 //     let env = &mut default_env();
