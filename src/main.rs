@@ -29,6 +29,7 @@ enum FelispExp {
     List(Vec<FelispExp>),
     Func(fn(&[FelispExp]) -> Result<FelispExp, FelispErr>), // function evaluations
     Lambda(FelispLambda),
+    Table(Table)
 }
 
 
@@ -44,6 +45,9 @@ impl fmt::Display for FelispExp {
             FelispExp::Func(_) => "Function {}".to_string(),
             FelispExp::Bool(a) => a.to_string(),
             FelispExp::Lambda(_) => "Lambda {}".to_string(),
+            FelispExp::Table(a) => {
+                format!("Table: Name: {} Rows: {}", a.name.to_string(), a.num_rows)
+            }
         };
 
         write!(f, "{}", str)
@@ -139,7 +143,7 @@ macro_rules! ensure_tonicity {
     }};
 }
 
-// Set up the environment to control functions and operators
+// Set up the environment to control functions and operators and data
 fn default_env<'a>() -> FelispEnv<'a> {
     let mut data: HashMap<String, FelispExp> = HashMap::new();
 
@@ -186,6 +190,20 @@ fn default_env<'a>() -> FelispEnv<'a> {
     data.insert(
         "<=".to_string(),
         FelispExp::Func(ensure_tonicity!(|a, b| a <= b))
+    );
+
+    // Database layer
+    let mut rows: Vec<Row> = Vec::new(); // or Vec::new()
+    let mut t = Table {
+        name: String::from("mytable1"),
+        num_rows: 0,
+        pages: 0,
+        rows: rows
+    };
+
+    data.insert(
+        "mytable1".to_string(),
+        FelispExp::Table(t)
     );
 
     FelispEnv { data, outer: None } // Return expression
@@ -265,6 +283,14 @@ fn eval_select_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<Feli
         )
     )?;
     println!(">> Called Select");
+    let mut t = eval(first_form, env)?;
+    println!(">> selected t is {} ", t);
+    match t {
+        FelispExp::Table(mut t) => {
+            execute_select(&mut t);
+        },
+        _ => {}
+    }
     Ok(first_form.clone())
 }
 
@@ -284,7 +310,26 @@ fn eval_insert_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<Feli
             "expected second form".to_string(),
         )
     )?;
-    println!("Called insert {} {} {}", first_form, second_form, third_form);
+    println!("Called insert [{} {} {}]", first_form, second_form, third_form);
+    let mut t = eval(first_form, env)?;
+    println!(">> insert t is {} ", t);
+    match t {
+        FelispExp::Table(mut t) => {
+            println!("+++ here");
+            execute_insert(
+                &mut t,
+                1,
+                second_form.to_string(),
+                third_form.to_string()
+            );
+            execute_select(&mut t);
+            env.data.insert(first_form.to_string(), FelispExp::Table(t));
+        },
+        _ => {
+            println!("----> here");
+        }
+    }
+
     Ok(first_form.clone())
 }
 
@@ -454,6 +499,14 @@ fn eval(exp: &FelispExp, env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
                     format!("<< unexpected symbol k='{}'", k)
                 )
             ),
+        FelispExp::Table(k) => {
+            env_get(&k.name[..], env)
+                .ok_or(
+                    FelispErr::Reason(
+                        format!("<< unexpected symbol k='{}'", &k.name)
+                    )
+                )
+        }
     }
 }
 
@@ -463,7 +516,6 @@ fn eval(exp: &FelispExp, env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
 fn parse_eval(expr: String, env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
     let (parsed_exp, _) = parse(&tokenize(expr))?;
     let evaled_exp = eval(&parsed_exp, env)?;
-
     Ok(evaled_exp)
 }
 
@@ -477,14 +529,14 @@ fn slurp_expr() -> String {
 
 
 /* Database layer */
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Row {
     id: i32,
     username: String,
     email: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Table {
     name: String,
     num_rows: i32,
@@ -541,27 +593,22 @@ fn test_insert1() {
     execute_select(&mut t);
 }
 
-
-
 fn main() {
-    test_insert1();
+
+    // Lisp layer
+    let env = &mut default_env();
+    loop {
+        println!("risp >");
+        let expr = slurp_expr();
+        match parse_eval(expr, env) {
+            Ok(res) => println!("// 🔥 => {}", res),
+            Err(e) => match e {
+                FelispErr::Reason(msg) => println!("// 🙀 => {}", msg),
+            },
+        }
+    }
+
 }
-
-// fn main() {
-
-//     let env = &mut default_env();
-//     loop {
-//         println!("risp >");
-//         let expr = slurp_expr();
-//         match parse_eval(expr, env) {
-//             Ok(res) => println!("// 🔥 => {}", res),
-//             Err(e) => match e {
-//                 FelispErr::Reason(msg) => println!("// 🙀 => {}", msg),
-//             },
-//         }
-//     }
-
-// }
 
 // fn main() {
 //     println!(" ==== hello Felisp!! ===");
