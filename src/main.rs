@@ -581,13 +581,13 @@ fn test_insert1() {
         &mut t,
         1,
         String::from("akriti"),
-        String::from("akritigaur@gmail.com")
+        String::from("def")
     );
     execute_insert(
         &mut t,
         10,
         String::from("viksit"),
-        String::from("viksit@gmail.com")
+        String::from("abc")
     );
     // println!("Table: {:?}", t);
     execute_select(&mut t);
