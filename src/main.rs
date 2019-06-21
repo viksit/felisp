@@ -23,6 +23,8 @@ use std::rc::Rc;
 mod lib;
 use lib::data::{FelispExp, FelispEnv, FelispErr, FelispLambda, Table, Row};
 
+mod db;
+use db::stmt::{execute_select, execute_insert};
 
 
 // Create a tokenizer that takes a felisp expression in string
@@ -428,46 +430,13 @@ fn slurp_expr() -> String {
 }
 
 
-// TODO(viksit): add a result with success etc to these functions
-
-fn execute_insert(table: &mut Table, id: i32, username: String, email: String) {
-    // insert data from a source data structure into a row
-    let mut row = Row {
-        id: id,
-        email: email,
-        username: username,
-    };
-    table.rows.push(row);
-    table.num_rows += 1;
-}
-
-fn execute_select(table: &mut Table) {
-    println!("Table: <{}>", table.name);
-    for row in &table.rows {
-        println!("{:?}", row);
-    }
-}
-
-fn test_insert1() {
-    let mut rows: Vec<Row> = Vec::new(); // or Vec::new()
-    let mut t = Table {
-        name: String::from("mytable1"),
-        num_rows: 0,
-        pages: 0,
-        rows: rows,
-    };
-    execute_insert(&mut t, 1, String::from("akriti"), String::from("def"));
-    execute_insert(&mut t, 10, String::from("viksit"), String::from("abc"));
-    execute_select(&mut t);
-}
-
 
 fn main() {
 
     // Lisp layer
     let env = &mut default_env();
     loop {
-        println!("risp >");
+        println!("Felisp> ");
         let expr = slurp_expr();
         match parse_eval(expr, env) {
             Ok(res) => println!("// 🔥 => {}", res),
