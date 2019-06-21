@@ -1,4 +1,5 @@
-use crate::lib::data::*;
+use crate::lib::data::Row;
+use crate::lib::data::Table;
 
 // TODO(viksit): add a result with success etc to these functions
 
