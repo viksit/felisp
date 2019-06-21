@@ -1,5 +1,7 @@
 use std::num::ParseFloatError;
-use crate::lib::data::{FelispExp, FelispErr, FelispEnv, FelispLambda, Table, Row};
+use std::rc::Rc;
+
+use crate::lib::data::*;
 
 // Now, convert this AST expression into a felisp expression
 
@@ -46,22 +48,33 @@ pub fn parse_atom(token: &str) -> FelispExp {
     }
 }
 
-#[macro_export]
-macro_rules! ensure_tonicity {
-    ($check_fn:expr) => {{
-        |args: &[FelispExp]| -> Result<FelispExp, FelispErr> {
-            let floats = parse_list_of_floats(args)?;
-            let first = floats.first().ok_or(FelispErr::Reason(
-                "expected at least one number".to_string(),
-            ))?;
-            let rest = &floats[1..];
-            fn f(prev: &f64, xs: &[f64]) -> bool {
-                match xs.first() {
-                    Some(x) => $check_fn(prev, x) && f(x, &xs[1..]),
-                    None => true,
-                }
-            };
-            Ok(FelispExp::Bool(f(first, rest)))
-        }
-    }};
+
+
+// Helper function that enforces all FelispExp's that we receive are floats
+pub fn parse_list_of_floats(args: &[FelispExp]) -> Result<Vec<f64>, FelispErr> {
+    args.iter().map(|x| parse_single_float(x)).collect() // no ; since return expression
+}
+
+pub fn parse_single_float(exp: &FelispExp) -> Result<f64, FelispErr> {
+    match exp {
+        FelispExp::Number(num) => Ok(*num),
+        _ => Err(FelispErr::Reason("expected a number".to_string())),
+    }
+}
+
+pub fn parse_list_of_symbol_strings(form: Rc<FelispExp>) -> Result<Vec<String>, FelispErr> {
+    let list = match form.as_ref() {
+        FelispExp::List(s) => Ok(s.clone()),
+        _ => Err(FelispErr::Reason(
+            "expected args form to be a list".to_string(),
+        )),
+    }?;
+    list.iter()
+        .map(|x| match x {
+            FelispExp::Symbol(s) => Ok(s.clone()),
+            _ => Err(FelispErr::Reason(
+                "expected symbols in the argument list".to_string(),
+            )),
+        })
+        .collect()
 }
