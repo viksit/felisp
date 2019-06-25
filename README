@@ -1,1 +1,4 @@
 Felisp :: A simple lisp in rust
+
+./test lib::db::serialize::test::test_file_serialize
+./run
