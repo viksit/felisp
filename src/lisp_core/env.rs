@@ -85,3 +85,10 @@ pub fn default_env<'a>() -> FelispEnv<'a> {
 
     FelispEnv { data, outer: None } // Return expression
 }
+
+
+#[test]
+fn test_env_cccc() {
+    assert_eq!(2, 2);
+    println!("yay test11 ++++++++++");
+}
