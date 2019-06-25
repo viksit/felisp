@@ -4,7 +4,7 @@ use std::process;
 
 use crate::lib::data::*;
 use crate::lisp_core::parser::*;
-use crate::db::stmt::{execute_insert, execute_select};
+use crate::lib::db::stmt::{execute_insert, execute_select};
 
 pub fn eval_if_args(arg_forms: &[FelispExp], env: &mut FelispEnv) -> Result<FelispExp, FelispErr> {
     let test_form = arg_forms

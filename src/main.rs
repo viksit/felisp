@@ -19,8 +19,7 @@ use std::io::{stdin, stdout, Write};
 mod lib;
 use lib::data::{FelispExp, FelispEnv, FelispErr, FelispLambda, Table, Row};
 
-mod db;
-use db::stmt::{execute_select, execute_insert};
+use lib::db::stmt::{execute_select, execute_insert};
 
 mod lisp_core;
 use lisp_core::tokenizer::tokenize;
@@ -44,44 +43,19 @@ fn slurp_expr() -> String {
     expr
 }
 
-// fn main() {
-
-//     // Lisp layer
-//     let env = &mut default_env();
-//     loop {
-//         println!("Felisp> ");
-//         let expr = slurp_expr();
-//         match parse_eval(expr, env) {
-//             Ok(res) => println!("// 🔥 => {}", res),
-//             Err(e) => match e {
-//                 FelispErr::Reason(msg) => println!("// 🙀 => {}", msg),
-//             },
-//         }
-//     }
-
-// }
-
-
-use serde::{Serialize, Deserialize};
-use bincode;
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct Entity {
-    x: f32,
-    y: f32,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct World(Vec<Entity>);
-
 fn main() {
-    let world = World(vec![Entity { x: 0.0, y: 4.0 }, Entity { x: 10.0, y: 20.5 }]);
-    let encoded: Vec<u8> = bincode::serialize(&world).unwrap();
 
-    // 8 bytes for the length of the vector, 4 bytes per float.
-    assert_eq!(encoded.len(), 8 + 4 * 4);
-    println!("encoded: {:?}", encoded);
-    let decoded: World = bincode::deserialize(&encoded[..]).unwrap();
-    println!("decoded: {:?}", decoded);
-    assert_eq!(world, decoded);
+    // Lisp layer
+    let env = &mut default_env();
+    loop {
+        println!("Felisp> ");
+        let expr = slurp_expr();
+        match parse_eval(expr, env) {
+            Ok(res) => println!("// 🔥 => {}", res),
+            Err(e) => match e {
+                FelispErr::Reason(msg) => println!("// 🙀 => {}", msg),
+            },
+        }
+    }
+
 }
