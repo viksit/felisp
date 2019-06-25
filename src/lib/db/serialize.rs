@@ -23,7 +23,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_1() {
+    fn test_serialize_examples() {
         let world = World(vec![Entity { x: 0.0, y: 4.0 }, Entity { x: 10.0, y: 20.5 }]);
         let encoded: Vec<u8> = bincode::serialize(&world).unwrap();
         // 8 bytes for the length of the vector, 4 bytes per float.
