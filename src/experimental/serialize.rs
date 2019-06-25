@@ -1,4 +1,5 @@
 use serde::{Serialize, Deserialize};
+use bincode;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct Entity {
