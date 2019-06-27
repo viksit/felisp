@@ -22,24 +22,12 @@ use crate::lib::data::*;
 // this should open a database and load it
 // (insert mytable1 value value) should insert this data into this file
 
-
-// pub fn execute_insert(table: &mut Table, id: i32, username: String, email: String) {
-//     // insert data from a source data structure into a row
-//     let mut row = Row {
-//         id: id,
-//         email: email,
-//         username: username,
-//     };
-//     //table.rows.push([Some(row)]);
-//     //table.num_rows += 1;
-// }
-
 pub fn execute_select(table: &mut Table) {
-    println!("Table: <{}, {} rows, {} pages>", table.name, table.num_rows, table.pages);
-    for row in &table.rows {
-        for subrow in row.iter() {
-            match subrow {
-                Some(subrow) => println!("{:?}", subrow),
+    println!("Table: <{}, {} num_rows, {} num_pages>", table.name, table.num_rows, table.num_pages);
+    for page in &table.pages {
+        for row in page.iter() {
+            match row {
+                Some(row) => println!("{:?}", row),
                 None => ()
             }
         }
@@ -50,16 +38,16 @@ pub fn execute_insert(table: &mut Table, id: i32, username: String, email: Strin
     // which row are we on
     // find which page to add this row to
     let page_num: i32 = (table.num_rows  as i32) / (ROWS_PER_PAGE as i32);
-    //println!(">> page_num: {}, num_pages: {}", page_num, table.pages);
+    //println!(">> page_num: {}, num_pages: {}", page_num, table.num_pages);
 
-    if (page_num > table.pages) {
+    if (page_num > table.num_pages) {
         // this page doesn't exist. so we
         // println!("********** this page {} doesn't exist lets create", page_num);
         // push a array of 10 rows into the rows vector
         let mut xs: [Option<Row>; 10] = Default::default();
-        // increment pages by 1
-        table.rows.push(xs);
-        table.pages+=1;
+        // increment num_pages by 1
+        table.pages.push(xs);
+        table.num_pages+=1;
         //println!("\ntable is now {:?}", table);
     }
 
@@ -72,7 +60,7 @@ pub fn execute_insert(table: &mut Table, id: i32, username: String, email: Strin
     };
     let row_offset: usize = table.num_rows as usize % ROWS_PER_PAGE as usize;
     //println!("pagenum: {}, numrows {}, row_offset: {}", page_num, table.num_rows, row_offset);
-    table.rows[page_num as usize][row_offset] = Some(row.clone());
+    table.pages[page_num as usize][row_offset] = Some(row.clone());
     table.num_rows+=1;
 }
 
@@ -82,8 +70,8 @@ fn create_dummy_table () -> Table {
     let mut t = Table {
         name: String::from("mytable1"),
         num_rows: 0,
-        pages: 0,
-        rows: vec![xs],
+        num_pages: 0,
+        pages: vec![xs],
     };
     for i in 0..22 {
         execute_insert(&mut t,
@@ -91,7 +79,7 @@ fn create_dummy_table () -> Table {
                        String::from(format!("apple{}", i+1)),
                        String::from(format!("apple{}@orange{}", i+1, i+1)));
     }
-    println!("dummy table: rows: {}, pages: {}", t.num_rows, t.pages);
+    println!("dummy table: rows: {}, num_pages: {}", t.num_rows, t.num_pages);
     t
 }
 
@@ -116,10 +104,20 @@ fn write_table_to_file(filename: String, table: &Table) {
     let encoded_num_rows = bincode::serialize(&table.num_rows).unwrap();
     file.write_all(&encoded_num_rows).expect("couldn't write data");
 
-    let encoded_pages = bincode::serialize(&table.pages).unwrap();
-    file.write_all(&encoded_pages).expect("couldn't write data");
+    let encoded_num_pages = bincode::serialize(&table.num_pages).unwrap();
+    file.write_all(&encoded_num_pages).expect("couldn't write data");
 
-    println!("encoded len: {}, {}, {}", encoded_name.len(), encoded_num_rows.len(), encoded_pages.len());
+    println!("encoded len: {}, {}, {}", encoded_name.len(), encoded_num_rows.len(), encoded_num_pages.len());
+
+    // Since we plan to write to file only when we flush
+    // lets write all pages together
+
+    for i in 0..table.num_pages {
+
+    }
+
+
+
 }
 
 fn read_table_from_file(filename: String) {
@@ -187,8 +185,8 @@ mod test {
         let mut t = Table {
             name: String::from("mytable1"),
             num_rows: 0,
-            pages: 0,
-            rows: vec![xs],
+            num_pages: 0,
+            pages: vec![xs],
         };
         for i in 0..22 {
             execute_insert(&mut t,
@@ -218,15 +216,15 @@ mod test {
         let mut t = Table {
             name: String::from("mytable1"),
             num_rows: 0,
-            pages: 0,
-            rows: vec![xs],
+            num_pages: 0,
+            pages: vec![xs],
         };
 
-        println!("t.rows: {:?}", t.rows[0]);
+        println!("t.rows: {:?}", t.pages[0]);
 
         for i in 0..10 {
-            t.rows[0][i] = Some(row.clone());
-            println!("i: {} row: {:?}", i, t.rows[0][i]);
+            t.pages[0][i] = Some(row.clone());
+            println!("i: {} row: {:?}", i, t.pages[0][i]);
         }
 
     }

@@ -97,8 +97,8 @@ pub const TABLE_MAX_ROWS: usize = ROWS_PER_PAGE * TABLE_MAX_PAGES;
 pub struct Table {
     pub name: String,
     pub num_rows: i32,
-    pub pages: i32,
-    pub rows: Vec<[Option<Row>; ROWS_PER_PAGE]>
+    pub num_pages: i32,
+    pub pages: Vec<[Option<Row>; ROWS_PER_PAGE]>
 }
 
 /*

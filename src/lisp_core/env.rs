@@ -77,8 +77,8 @@ pub fn default_env<'a>() -> FelispEnv<'a> {
     let mut t = Table {
         name: String::from("mytable1"),
         num_rows: 0,
-        pages: 0,
-        rows: vec![],
+        num_pages: 0,
+        pages: vec![],
     };
 
     data.insert("mytable1".to_string(), FelispExp::Table(t));
