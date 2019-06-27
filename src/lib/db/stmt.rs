@@ -1,3 +1,20 @@
+use std::io::prelude::*;
+use std::error::Error;
+use std::path::Path;
+use std::fs::File;
+
+use std::io::BufWriter;
+use std::io::BufReader;
+use std::io::Cursor;
+use std::io::Read;
+use std::io::SeekFrom;
+use std::io::Seek;
+use std::io::BufRead;
+
+
+use serde::{Serialize, Deserialize};
+use bincode; // serialize_into will be useful
+
 use crate::lib::data::*;
 // TODO(viksit): add a result with success etc to these functions
 
@@ -59,10 +76,78 @@ pub fn execute_insert(table: &mut Table, id: i32, username: String, email: Strin
     table.num_rows+=1;
 }
 
+
+fn create_dummy_table () -> Table {
+    let mut xs: [Option<Row>; 10] = Default::default();
+    let mut t = Table {
+        name: String::from("mytable1"),
+        num_rows: 0,
+        pages: 0,
+        rows: vec![xs],
+    };
+    for i in 0..22 {
+        execute_insert(&mut t,
+                       i+1,
+                       String::from(format!("apple{}", i+1)),
+                       String::from(format!("apple{}@orange{}", i+1, i+1)));
+    }
+    println!("dummy table: rows: {}, pages: {}", t.num_rows, t.pages);
+    t
+}
+
 fn db_open(filename: String) {
-    use std::fs::File;
+
     let mut file = File::open(filename).unwrap();
 }
+
+fn write_table_to_file(filename: String, table: &Table) {
+    let path = Path::new(&filename);
+    let display = path.display();
+
+    // Open a file in write-only mode, returns `io::Result<File>`
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+        Ok(file) => file,
+    };
+    // First write meta into the file
+    let encoded_name = bincode::serialize(&table.name).unwrap();
+    file.write_all(&encoded_name).expect("couldn't write data");
+
+    let encoded_num_rows = bincode::serialize(&table.num_rows).unwrap();
+    file.write_all(&encoded_num_rows).expect("couldn't write data");
+
+    let encoded_pages = bincode::serialize(&table.pages).unwrap();
+    file.write_all(&encoded_pages).expect("couldn't write data");
+
+    println!("encoded len: {}, {}, {}", encoded_name.len(), encoded_num_rows.len(), encoded_pages.len());
+}
+
+fn read_table_from_file(filename: String) {
+    let path = Path::new(&filename);
+    let display = path.display();
+
+    // Open a file in write-only mode, returns `io::Result<File>`
+    let mut file = match File::open(&path) {
+        Err(why) => panic!("couldn't open {}: {}", display, why.description()),
+        Ok(file) => file,
+    };
+    let mut namebuf = [0u8;16];
+    let mut rowbuf = [0u8;4];
+    let mut pagebuf = [0u8;4];
+    file.read(&mut namebuf).unwrap();
+    let decodedname: String = bincode::deserialize(&mut namebuf).unwrap();
+    println!("decoded name: {:?}", decodedname);
+    file.seek(SeekFrom::Start(16)).unwrap();
+    file.read(&mut rowbuf).unwrap();
+    let decodedrow: i32 = bincode::deserialize(&mut rowbuf).unwrap();
+    println!("decoded row: {:?}", decodedrow);
+    file.seek(SeekFrom::Start(20)).unwrap();
+    file.read(&mut pagebuf).unwrap();
+    let decodedpage: i32 = bincode::deserialize(&mut pagebuf).unwrap();
+    println!("decoded page: {:?}", decodedpage);
+}
+
+
 
 #[cfg(test)]
 mod test {
@@ -70,22 +155,31 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_db_open() {
-        println!("sfds");
-        test_execute_select();
+    fn test_dummy_table() {
+        let t = create_dummy_table();
+        println!("{:?}", t);
     }
 
     #[test]
-    fn test_write_to_file() {
-        // ?
+    fn test_db_open() {
+        // db open means we find a file and in a struct, store the open file descriptor in our
+        // struct
+        // ill
+    }
+
+    #[test]
+    fn test_write_table_to_file() {
         // for now, we will do a flush at the very end
         // where we read the file on open and store 1 page
         // then when we are done, we flush and rewrite the file page by page
-        //
-
-
+        let mut t = create_dummy_table();
+        write_table_to_file("/tmp/mytable1.bar".to_string(), &t);
     }
 
+    #[test]
+    fn test_read_table_from_file() {
+        read_table_from_file("/tmp/mytable1.bar".to_string());
+    }
 
     #[test]
     fn test_execute_insert() {
@@ -107,20 +201,7 @@ mod test {
 
     #[test]
     fn test_execute_select() {
-        let mut xs: [Option<Row>; 10] = Default::default();
-        let mut t = Table {
-            name: String::from("mytable1"),
-            num_rows: 0,
-            pages: 0,
-            rows: vec![xs],
-        };
-        for i in 0..25 {
-            execute_insert(&mut t,
-                           i,
-                           String::from(format!("apple{}", i)),
-                           String::from(format!("apple{}@orange{}", i, i)));
-        }
-
+        let mut t = create_dummy_table();
         execute_select(&mut t);
     }
 

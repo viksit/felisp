@@ -100,3 +100,29 @@ pub struct Table {
     pub pages: i32,
     pub rows: Vec<[Option<Row>; ROWS_PER_PAGE]>
 }
+
+/*
+
+### Future
+- create a database struct
+- this can store a list of tables
+- when we say open(database), it can read a file for that database
+- this database only has one table for now
+
+### Writing file
+- for now, just store a table in a file
+- each table is stored in a byte format
+- we encode this file with a meta structure (first, 1k bytes)
+- next we start to add pages
+- each page is encoded as an array
+- when we save the file, we store meta, then we seek forward
+- and we loop through pages and store each page in the file
+
+### Reading
+- when reading a file, we'll open the file, and read the first 4k into meta
+- then, we'll seek to 4k and read the first page into memory
+- next time a request for new page happens, we will see if there exists a page in
+the file. if it doesn't, we'll create it in memory. if it does, we'll load it up.
+
+
+*/
