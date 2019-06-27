@@ -59,10 +59,33 @@ pub fn execute_insert(table: &mut Table, id: i32, username: String, email: Strin
     table.num_rows+=1;
 }
 
+fn db_open(filename: String) {
+    use std::fs::File;
+    let mut file = File::open(filename).unwrap();
+}
+
 #[cfg(test)]
 mod test {
 
     use super::*;
+
+    #[test]
+    fn test_db_open() {
+        println!("sfds");
+        test_execute_select();
+    }
+
+    #[test]
+    fn test_write_to_file() {
+        // ?
+        // for now, we will do a flush at the very end
+        // where we read the file on open and store 1 page
+        // then when we are done, we flush and rewrite the file page by page
+        //
+
+
+    }
+
 
     #[test]
     fn test_execute_insert() {

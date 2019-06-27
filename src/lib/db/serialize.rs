@@ -1,3 +1,4 @@
+use std::io::prelude::*;
 use std::error::Error;
 use std::path::Path;
 use std::fs::File;
@@ -9,6 +10,7 @@ use std::io::Read;
 use std::io::SeekFrom;
 use std::io::Seek;
 use std::io::BufRead;
+
 
 use serde::{Serialize, Deserialize};
 use bincode; // serialize_into will be useful
@@ -140,7 +142,48 @@ mod test {
         println!("decoded {:?}", decoded);
     }
 
+    #[test]
+    fn test_write_binary() {
+        let path = Path::new("/tmp/foo1.bar");
+        let display = path.display();
+        static LOREM_IPSUM: &str =
+            "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse
+cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non
+proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+";
 
+        // Open a file in write-only mode, returns `io::Result<File>`
+        let mut file = match File::create(&path) {
+            Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+            Ok(file) => file,
+        };
 
+        // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
+        match file.write_all(LOREM_IPSUM.as_bytes()) {
+            Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
+            Ok(_) => println!("successfully wrote to {}", display),
+        }
+    }
+
+    #[test]
+    fn test_write_2() {
+        let world = World(vec![Entity { x: 0.0, y: 4.0 }, Entity { x: 10.0, y: 20.5 }]);
+        let encoded: Vec<u8> = bincode::serialize(&world).unwrap();
+        println!("encoded len is {}", encoded.len());
+        let path = Path::new("/tmp/foo2.bar");
+        let display = path.display();
+        // Open a file in write-only mode, returns `io::Result<File>`
+        let mut file = match File::create(&path) {
+            Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+            Ok(file) => file,
+        };
+        match file.write_all(&encoded) {
+            Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
+            Ok(_) => println!("successfully wrote to {}", display),
+        }
+    }
 
 }
