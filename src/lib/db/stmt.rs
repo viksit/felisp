@@ -15,8 +15,8 @@ pub fn execute_insert(table: &mut Table, id: i32, username: String, email: Strin
         email: email,
         username: username,
     };
-    table.rows.push(row);
-    table.num_rows += 1;
+    //table.rows.push([Some(row)]);
+    //table.num_rows += 1;
 }
 
 pub fn execute_select(table: &mut Table) {

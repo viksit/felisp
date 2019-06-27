@@ -134,12 +134,13 @@ mod test {
     #[test]
     fn test_seek_binary() {
         let mut file = File::open("/tmp/foo.bar").unwrap();
-        let mut buf=[0u8;24];
+        let mut buf=[0u8;24]; // size 24 for the world vector
         file.read(&mut buf).unwrap();
-        // println!("{:?}", &buf);
         let decoded: World = bincode::deserialize(&mut buf).unwrap();
         println!("decoded {:?}", decoded);
     }
+
+
 
 
 }

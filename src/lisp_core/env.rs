@@ -78,7 +78,7 @@ pub fn default_env<'a>() -> FelispEnv<'a> {
         name: String::from("mytable1"),
         num_rows: 0,
         pages: 0,
-        rows: rows,
+        rows: vec![],
     };
 
     data.insert("mytable1".to_string(), FelispExp::Table(t));
