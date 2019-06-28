@@ -73,18 +73,17 @@ fn create_dummy_table () -> Table {
         num_pages: 0,
         pages: vec![xs],
     };
-    for i in 0..22 {
+    for i in 0..21 {
         execute_insert(&mut t,
-                       i+1,
-                       String::from(format!("apple{}", i+1)),
-                       String::from(format!("apple{}@orange{}", i+1, i+1)));
+                       i,
+                       String::from(format!("apple{}", i)),
+                       String::from(format!("apple{}@orange{}", i, i)));
     }
     println!("dummy table: rows: {}, num_pages: {}", t.num_rows, t.num_pages);
     t
 }
 
 fn db_open(filename: String) {
-
     let mut file = File::open(filename).unwrap();
 }
 
@@ -97,14 +96,19 @@ fn write_table_to_file(filename: String, table: &Table) {
         Err(why) => panic!("couldn't create {}: {}", display, why.description()),
         Ok(file) => file,
     };
+
     // First write meta into the file
     let encoded_name = bincode::serialize(&table.name).unwrap();
+    file.write_all(&encoded_name.len().to_ne_bytes()).expect("oops");
+    println!("bytes for {} are {:?}", &table.name, &encoded_name.len().to_ne_bytes());
     file.write_all(&encoded_name).expect("couldn't write data");
 
     let encoded_num_rows = bincode::serialize(&table.num_rows).unwrap();
+    file.write_all(&encoded_num_rows.len().to_ne_bytes()).expect("oops");
     file.write_all(&encoded_num_rows).expect("couldn't write data");
 
     let encoded_num_pages = bincode::serialize(&table.num_pages).unwrap();
+    file.write_all(&encoded_num_pages.len().to_ne_bytes()).expect("oops");
     file.write_all(&encoded_num_pages).expect("couldn't write data");
 
     println!("encoded len: {}, {}, {}", encoded_name.len(), encoded_num_rows.len(), encoded_num_pages.len());
@@ -113,11 +117,81 @@ fn write_table_to_file(filename: String, table: &Table) {
     // lets write all pages together
 
     for i in 0..table.num_pages {
-
+        println!("page {}", i);
+        let tp = &table.pages[i as usize];
+        println!("serializing {:?}", table.pages[i as usize]);
+        let encoded_page = bincode::serialize(&tp).unwrap();
+        println!("encode page size: {}", encoded_page.len());
+        //file.write_all(&encoded_page).expect("couldn't write page");
     }
 
+    /*
+    In order for us to store data in this file, we need to figure out how big a page is
+    - unless we specify a max limit for a page, we can't efficiently retrieve it since
+    each array of row structs can have a different size.
+    - So, we can do something interesting here.
+
+    (1)
+    - Lets specify a byte buffer of 4k
+    - Copy whatever serialized version of the page looks like into this buffer
+    - Make the first item in the buffer the total size of the actual contents and the rest is none?
+    - when someone wants to read this, they first allocate a buffer of 4k
+    - then they read buf[0] to figure how many bytes to read. If this is a i32
+    - then seek to start + 4 bytes
+    - and read that into a page buffer
+
+    (2)
+    - second approach is to keep size and bytes
+    - dynamically create the buffer to read into it
+
+     */
 
 
+
+
+}
+use std::fmt;
+
+enum MyResult {
+    I(i32),
+    S(&'static str)
+}
+impl fmt::Display for MyResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let str = match self {
+            MyResult::I(a) => format!("{}", a),
+            MyResult::S(a) => format!("{}", a)
+        };
+        write!(f, "{}", str)
+    }
+}
+
+fn read_field_from_file<'a>(mut file: &File, typename: &'a str) -> MyResult {
+    //println!("file2 : {:?}", file);
+    let mut field_size_buf = [0u8;8];
+    file.read(&mut field_size_buf).unwrap();
+    let field_size = i64::from_ne_bytes(field_size_buf);
+    println!("field size: {}", field_size);
+    let mut field_buf = vec![0; field_size as usize];
+    file.read(&mut field_buf).unwrap();
+    println!("field buf: {:?}", field_buf);
+    match typename {
+        "String" =>  {
+            let decoded_field:String  = bincode::deserialize(&mut field_buf).unwrap();
+            let s: &str = Box::leak(decoded_field.into_boxed_str());
+            MyResult::S(s)
+        },
+        "i32" =>  {
+            let decoded_field:i32  = bincode::deserialize(&mut field_buf).unwrap();
+            MyResult::I(decoded_field)
+        },
+        _ => {
+            println!("Unsupported type");
+            MyResult::S("")
+        }
+
+    }
+    //println!("decoded field: {:?}", decoded_field);
 }
 
 fn read_table_from_file(filename: String) {
@@ -129,20 +203,40 @@ fn read_table_from_file(filename: String) {
         Err(why) => panic!("couldn't open {}: {}", display, why.description()),
         Ok(file) => file,
     };
-    let mut namebuf = [0u8;16];
-    let mut rowbuf = [0u8;4];
-    let mut pagebuf = [0u8;4];
-    file.read(&mut namebuf).unwrap();
-    let decodedname: String = bincode::deserialize(&mut namebuf).unwrap();
-    println!("decoded name: {:?}", decodedname);
-    file.seek(SeekFrom::Start(16)).unwrap();
-    file.read(&mut rowbuf).unwrap();
-    let decodedrow: i32 = bincode::deserialize(&mut rowbuf).unwrap();
-    println!("decoded row: {:?}", decodedrow);
-    file.seek(SeekFrom::Start(20)).unwrap();
-    file.read(&mut pagebuf).unwrap();
-    let decodedpage: i32 = bincode::deserialize(&mut pagebuf).unwrap();
-    println!("decoded page: {:?}", decodedpage);
+
+    println!(">>> file1: {:?}", file);
+    let field1 = read_field_from_file(&file, "String");
+    println!("field1: {}", field1);
+    // file.seek(SeekFrom::Start()).unwrap();
+    let field2 = read_field_from_file(&file, "i32");
+    println!("field2: {}", field2);
+
+    let field3 = read_field_from_file(&file, "i32");
+    println!("field3: {}", field3);
+
+    // let mut rowbuf = [0u8;8];
+    // let mut pagebuf = [0u8;4];
+
+    // let mut namesizebuf = [0u8;8];
+    // file.read(&mut namesizebuf).unwrap();
+    // let namesize = i64::from_ne_bytes(namesizebuf);
+    // let mut namebuf = vec![0; namesize as usize];
+    // file.read(&mut namebuf).unwrap();
+    // let decodedname: String = bincode::deserialize(&mut namebuf).unwrap();
+    // println!("decoded name: {:?}", decodedname);
+
+
+    //     file.read(&mut namebuf).unwrap();
+    //     let decodedname: String = bincode::deserialize(&mut namebuf).unwrap();
+    //     println!("decoded name: {:?}", decodedname);
+    //     file.seek(SeekFrom::Start(16)).unwrap();
+    //     file.read(&mut rowbuf).unwrap();
+    //     let decodedrow: i32 = bincode::deserialize(&mut rowbuf).unwrap();
+    //     println!("decoded row: {:?}", decodedrow);
+    //     file.seek(SeekFrom::Start(20)).unwrap();
+    //     file.read(&mut pagebuf).unwrap();
+    //     let decodedpage: i32 = bincode::deserialize(&mut pagebuf).unwrap();
+//     println!("decoded page: {:?}", decodedpage);
 }
 
 
@@ -205,7 +299,7 @@ mod test {
 
 
     #[test]
-    fn basic_vec() {
+    fn test_basic_paging() {
         let mut row = Row {
             id: 10,
             email: String::from("email1"),
@@ -219,31 +313,11 @@ mod test {
             num_pages: 0,
             pages: vec![xs],
         };
-
         println!("t.rows: {:?}", t.pages[0]);
-
         for i in 0..10 {
             t.pages[0][i] = Some(row.clone());
             println!("i: {} row: {:?}", i, t.pages[0][i]);
         }
 
     }
-
-    #[test]
-    fn test_serialize_row() {
-        // compact repr - take structure and serialize into bytes
-        // rather than use the bytes system as in the sqlite tutorial
-        // we'll use bincode to serialize each row object
-
-    }
-
-    #[test]
-    fn test_deserialize_row_from_bytes() {
-        // given bytes, deserialize via bincode
-    }
-
-    #[test]
-    fn test_insert_row() {
-    }
-
 }
