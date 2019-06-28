@@ -21,6 +21,24 @@ use crate::lib::data::*;
 // (use database)
 // this should open a database and load it
 // (insert mytable1 value value) should insert this data into this file
+use std::fmt;
+
+enum MyResult {
+    I(i32),
+    S(&'static str),
+    V([Option<Row>; ROWS_PER_PAGE])
+}
+impl fmt::Display for MyResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let str = match self {
+            MyResult::I(a) => format!("{}", a),
+            MyResult::S(a) => format!("{}", a),
+            MyResult::V(a) => format!("{:?}", a)
+        };
+        write!(f, "{}", str)
+    }
+}
+
 
 pub fn execute_select(table: &mut Table) {
     println!("Table: <{}, {} num_rows, {} num_pages>", table.name, table.num_rows, table.num_pages);
@@ -112,7 +130,6 @@ fn write_table_to_file(filename: String, table: &Table) {
     file.write_all(&encoded_num_pages).expect("couldn't write data");
 
     println!("encoded len: {}, {}, {}", encoded_name.len(), encoded_num_rows.len(), encoded_num_pages.len());
-
     // Since we plan to write to file only when we flush
     // lets write all pages together
 
@@ -122,7 +139,9 @@ fn write_table_to_file(filename: String, table: &Table) {
         println!("serializing {:?}", table.pages[i as usize]);
         let encoded_page = bincode::serialize(&tp).unwrap();
         println!("encode page size: {}", encoded_page.len());
-        //file.write_all(&encoded_page).expect("couldn't write page");
+        println!("encoded page is : {:?}", encoded_page);
+        file.write_all(&encoded_page.len().to_ne_bytes()).expect("oops");
+        file.write_all(&encoded_page).expect("couldn't write page");
     }
 
     /*
@@ -150,21 +169,6 @@ fn write_table_to_file(filename: String, table: &Table) {
 
 
 }
-use std::fmt;
-
-enum MyResult {
-    I(i32),
-    S(&'static str)
-}
-impl fmt::Display for MyResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let str = match self {
-            MyResult::I(a) => format!("{}", a),
-            MyResult::S(a) => format!("{}", a)
-        };
-        write!(f, "{}", str)
-    }
-}
 
 fn read_field_from_file<'a>(mut file: &File, typename: &'a str) -> MyResult {
     //println!("file2 : {:?}", file);
@@ -184,6 +188,10 @@ fn read_field_from_file<'a>(mut file: &File, typename: &'a str) -> MyResult {
         "i32" =>  {
             let decoded_field:i32  = bincode::deserialize(&mut field_buf).unwrap();
             MyResult::I(decoded_field)
+        },
+        "Page" => {
+            let decoded_field: [Option<Row>; ROWS_PER_PAGE] = bincode::deserialize(&mut field_buf).unwrap();
+            MyResult::V(decoded_field)
         },
         _ => {
             println!("Unsupported type");
@@ -207,36 +215,17 @@ fn read_table_from_file(filename: String) {
     println!(">>> file1: {:?}", file);
     let field1 = read_field_from_file(&file, "String");
     println!("field1: {}", field1);
-    // file.seek(SeekFrom::Start()).unwrap();
+    // file.seek(SeekFrom::Start(16)).unwrap();
     let field2 = read_field_from_file(&file, "i32");
     println!("field2: {}", field2);
-
     let field3 = read_field_from_file(&file, "i32");
     println!("field3: {}", field3);
-
-    // let mut rowbuf = [0u8;8];
-    // let mut pagebuf = [0u8;4];
-
-    // let mut namesizebuf = [0u8;8];
-    // file.read(&mut namesizebuf).unwrap();
-    // let namesize = i64::from_ne_bytes(namesizebuf);
-    // let mut namebuf = vec![0; namesize as usize];
-    // file.read(&mut namebuf).unwrap();
-    // let decodedname: String = bincode::deserialize(&mut namebuf).unwrap();
-    // println!("decoded name: {:?}", decodedname);
+    let field4 = read_field_from_file(&file, "Page");
+    println!("field4: {}", field4);
+    let field5 = read_field_from_file(&file, "Page");
+    println!("field5: {}", field5);
 
 
-    //     file.read(&mut namebuf).unwrap();
-    //     let decodedname: String = bincode::deserialize(&mut namebuf).unwrap();
-    //     println!("decoded name: {:?}", decodedname);
-    //     file.seek(SeekFrom::Start(16)).unwrap();
-    //     file.read(&mut rowbuf).unwrap();
-    //     let decodedrow: i32 = bincode::deserialize(&mut rowbuf).unwrap();
-    //     println!("decoded row: {:?}", decodedrow);
-    //     file.seek(SeekFrom::Start(20)).unwrap();
-    //     file.read(&mut pagebuf).unwrap();
-    //     let decodedpage: i32 = bincode::deserialize(&mut pagebuf).unwrap();
-//     println!("decoded page: {:?}", decodedpage);
 }
 
 
